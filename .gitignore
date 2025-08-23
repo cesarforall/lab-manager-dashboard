@@ -1,0 +1,19 @@
+# Base de datos local
+lab_manager.db
+*.sqlite
+*.sqlite3
+
+# Caché de Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Entornos virtuales
+venv/
+env/
+.venv/
+
+# IDEs
+.vscode/
+.idea/
+*.iml
