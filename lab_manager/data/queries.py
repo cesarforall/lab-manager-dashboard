@@ -13,6 +13,13 @@ def get_models_by_manufacturer(conn, manufacturer=None):
         c.execute("SELECT DISTINCT model FROM Devices WHERE manufacturer=?", (manufacturer,))
     return [row[0] for row in c.fetchall()]
 
+def get_all_technicians(conn):
+    c = conn.cursor()
+    c.execute("""
+        SELECT id, name, created_at FROM Technicians;
+    """)
+    return c.fetchall()
+
 def get_total_technicians(conn):
     c = conn.cursor()
     c.execute("""

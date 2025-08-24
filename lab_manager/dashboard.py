@@ -85,6 +85,12 @@ class Dashboard(QWidget):
         tech_view_layout = QHBoxLayout()
         filters_container.addLayout(tech_view_layout)
 
+        # Botón para mostrar/ocultar lateral izquierdo
+        self.toggle_sidebar_left_btn = QPushButton("Técnicos")
+        self.toggle_sidebar_left_btn.setCheckable(True)
+        self.toggle_sidebar_left_btn.clicked.connect(lambda checked: self.left_sidebar_scroll.setVisible(checked))
+        tech_view_layout.addWidget(self.toggle_sidebar_left_btn)
+
         tech_view_layout.addStretch()
 
         # Label de técnicos
@@ -116,6 +122,24 @@ class Dashboard(QWidget):
         # --- Contenedor central (WS layout + sidebar) ---
         content_layout = QHBoxLayout()
         main_layout.addLayout(content_layout)
+
+        # Sidebar izquierdo con scroll
+        self.left_sidebar = QWidget()
+        self.left_sidebar_layout = QVBoxLayout()
+        self.left_sidebar_layout.setContentsMargins(0, 0, 0, 0)
+        self.left_sidebar_layout.setSpacing(0)
+        self.left_sidebar.setLayout(self.left_sidebar_layout)
+
+        self.technician_list = QListWidget()
+        self.left_sidebar_layout.addWidget(self.technician_list)
+
+        self.left_sidebar_scroll = QScrollArea()
+        self.left_sidebar_scroll.setWidgetResizable(True)
+        self.left_sidebar_scroll.setWidget(self.left_sidebar)
+        self.left_sidebar_scroll.setFixedWidth(200)
+        self.left_sidebar_scroll.setVisible(False)
+
+        content_layout.addWidget(self.left_sidebar_scroll, stretch=1)
 
         # Grid layout para Workstations con scroll
         self.dashboard_widget = QWidget()
@@ -149,6 +173,7 @@ class Dashboard(QWidget):
 
         # --- Inicializar ---
         self.update_model_list()
+        self.update_technician_list()
     
     def set_view_mode(self, mode):
             self.view_mode = mode
@@ -316,6 +341,12 @@ class Dashboard(QWidget):
         for manufacturer, model, version, created_at in updates:
             item_text = f"{created_at[:16]} - {manufacturer} {model}: {version}"
             self.latest_updates_list.addItem(item_text)
+
+    def update_technician_list(self):
+        self.technician_list.clear()
+        technicians = queries.get_all_technicians(self.conn)
+        for tech_id, name, created_at in technicians:
+            self.technician_list.addItem(name)
 
     def mark_update(self, technician_id, update_id):
         queries.mark_update_as_confirmed(self.conn, technician_id, update_id)
