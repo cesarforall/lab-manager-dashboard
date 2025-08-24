@@ -18,24 +18,28 @@ CREATE TABLE Workstations (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
     pos_x INTEGER NOT NULL,
-    pos_y INTEGER NOT NULL
+    pos_y INTEGER NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE Technicians (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL
+    name TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE Devices (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     manufacturer TEXT NOT NULL,
-    model TEXT NOT NULL
+    model TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE PCs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     device_id INTEGER NOT NULL,
     serial_number TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(device_id) REFERENCES Devices(id)
 );
 
@@ -43,6 +47,7 @@ CREATE TABLE Assignments (
     workstation_id INTEGER NOT NULL UNIQUE,
     technician_id INTEGER NOT NULL UNIQUE,
     pc_id INTEGER NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (workstation_id, technician_id),
     FOREIGN KEY(workstation_id) REFERENCES Workstations(id),
     FOREIGN KEY(technician_id) REFERENCES Technicians(id),
@@ -52,6 +57,7 @@ CREATE TABLE Assignments (
 CREATE TABLE TechnicianDevices (
     technician_id INTEGER NOT NULL,
     device_id INTEGER NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(technician_id) REFERENCES Technicians(id),
     FOREIGN KEY(device_id) REFERENCES Devices(id)
 );
@@ -60,6 +66,7 @@ CREATE TABLE DeviceUpdates (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     device_id INTEGER NOT NULL,
     version TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(device_id) REFERENCES Devices(id)
 );
 
@@ -67,6 +74,7 @@ CREATE TABLE TechnicianUpdateConfirmations (
     technician_id INTEGER NOT NULL,
     update_id INTEGER NOT NULL,
     confirmed INTEGER NOT NULL DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (technician_id, update_id),
     FOREIGN KEY(technician_id) REFERENCES Technicians(id),
     FOREIGN KEY(update_id) REFERENCES DeviceUpdates(id)
