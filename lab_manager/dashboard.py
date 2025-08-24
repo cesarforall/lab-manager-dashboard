@@ -1,14 +1,17 @@
 import sys
 import sqlite3
+import datetime
 from PyQt6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QComboBox, QListWidget, QListWidgetItem, QGridLayout, QGroupBox, QScrollArea,
-    QSizePolicy, QCheckBox
+    QSizePolicy, QCheckBox, QFileDialog
 )
 from PyQt6.QtCore import Qt
 from functools import partial
 from lab_manager.data.database import get_connection, init_db
 from lab_manager.data import queries
+
+from lab_manager.utils import export
 
 WIDGET_WIDTH = 150
 WIDGET_HEIGHT = 180
@@ -83,7 +86,10 @@ class Dashboard(QWidget):
         self.tech_count_label.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         tech_view_layout.addWidget(self.tech_count_label, alignment=Qt.AlignmentFlag.AlignVCenter)
 
-        tech_view_layout.addStretch()
+        # Botón de exportar a la derecha del label
+        self.export_btn = QPushButton("Excel")
+        tech_view_layout.addWidget(self.export_btn)
+        self.export_btn.clicked.connect(self.export_current_dashboard)
 
         # Botones de vista
         self.grid_btn = QPushButton("Cuadrícula")
@@ -267,3 +273,53 @@ class Dashboard(QWidget):
     def mark_update(self, rowid):
         queries.mark_update_as_confirmed(self.conn, rowid)
         self.update_dashboard()
+
+    def export_current_dashboard(self):
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        default_name = f"dashboard_{timestamp}.xlsx"
+
+        path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Guardar Excel",
+            default_name,
+            "Archivos Excel (*.xlsx)"
+        )
+        if not path:
+            return
+
+        data = []
+        manufacturer_filter = self.manufacturer_cb.currentText()
+        selected_models = [
+            self.model_list.item(i).text()
+            for i in range(self.model_list.count())
+            if self.model_list.item(i).checkState() == Qt.CheckState.Checked
+        ]
+        pending_only = self.pending_cb.isChecked()
+
+        ws_rows = queries.get_workstations_with_assignments(self.conn)
+        for ws_id, tech_id, ws_name, tech_name, pos_x, pos_y, pc_serial in ws_rows:
+            if tech_id is None:
+                continue
+
+            updates = queries.get_latest_updates_for_technician(self.conn, tech_id)
+            for manufacturer, model, version, confirmed, update_id in updates:
+                if manufacturer_filter != "Todas" and manufacturer != manufacturer_filter:
+                    continue
+                if selected_models and model not in selected_models:
+                    continue
+                if pending_only and confirmed:
+                    continue
+
+                data.append({
+                    "Workstation": ws_name,
+                    "Técnico": tech_name,
+                    "PC": pc_serial,
+                    "Fabricante": manufacturer,
+                    "Modelo": model,
+                    "Versión": version,
+                    "Actualizado": bool(confirmed)
+                })
+
+        export_path = export.export_to_excel(data, path)
+        if export_path:
+            print(f"Exportado a {export_path}")
