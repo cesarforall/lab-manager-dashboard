@@ -72,14 +72,35 @@ def get_pending_updates_count(conn, tech_id, manufacturer=None, models=None):
 def get_updates_for_technician(conn, tech_id):
     c = conn.cursor()
     c.execute("""
-        SELECT d.manufacturer, d.model, du.version, 
-            COALESCE(tuc.confirmed,0) AS confirmed, tuc.rowid
+        SELECT d.manufacturer, d.model, du.version,
+            COALESCE(tuc.confirmed, 0) AS confirmed, du.id AS update_id
         FROM TechnicianDevices td
         JOIN Devices d ON td.device_id = d.id
         LEFT JOIN DeviceUpdates du ON d.id = du.device_id
         LEFT JOIN TechnicianUpdateConfirmations tuc
             ON tuc.technician_id = td.technician_id AND tuc.update_id = du.id
         WHERE td.technician_id = ?
+        ORDER BY du.id DESC
+    """, (tech_id,))
+    return c.fetchall()
+    
+def get_latest_updates_for_technician(conn, tech_id):
+    c = conn.cursor()
+    c.execute("""
+        SELECT manufacturer, model, version, confirmed, update_id
+        FROM (
+            SELECT d.manufacturer, d.model, du.version,
+                COALESCE(tuc.confirmed, 0) AS confirmed,
+                du.id AS update_id
+            FROM TechnicianDevices td
+            JOIN Devices d ON td.device_id = d.id
+            LEFT JOIN DeviceUpdates du ON d.id = du.device_id
+            LEFT JOIN TechnicianUpdateConfirmations tuc
+                ON tuc.technician_id = td.technician_id AND tuc.update_id = du.id
+            WHERE td.technician_id = ?
+            ORDER BY du.id DESC
+        )
+        GROUP BY manufacturer, model
     """, (tech_id,))
     return c.fetchall()
 

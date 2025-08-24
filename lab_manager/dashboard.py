@@ -213,7 +213,7 @@ class Dashboard(QWidget):
                 v_layout.addWidget(technician)
 
                 # Actualizaciones del técnico
-                updates = queries.get_updates_for_technician(self.conn, tech_id)
+                updates = queries.get_latest_updates_for_technician(self.conn, tech_id)
                 for manufacturer, model, version, confirmed, rowid in updates:
                     if selected_models and model not in selected_models:
                         continue
