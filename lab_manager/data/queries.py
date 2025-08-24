@@ -104,7 +104,10 @@ def get_latest_updates_for_technician(conn, tech_id):
     """, (tech_id,))
     return c.fetchall()
 
-def mark_update_as_confirmed(conn, rowid):
+def mark_update_as_confirmed(conn, technician_id, update_id):
     c = conn.cursor()
-    c.execute("UPDATE TechnicianUpdateConfirmations SET confirmed=1 WHERE rowid=?", (rowid,))
+    c.execute(
+        "UPDATE TechnicianUpdateConfirmations SET confirmed=1 WHERE technician_id=? AND update_id=?",
+        (technician_id, update_id)
+    )
     conn.commit()

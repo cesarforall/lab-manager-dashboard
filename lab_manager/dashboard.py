@@ -220,7 +220,7 @@ class Dashboard(QWidget):
 
                 # Actualizaciones del técnico
                 updates = queries.get_latest_updates_for_technician(self.conn, tech_id)
-                for manufacturer, model, version, confirmed, rowid in updates:
+                for manufacturer, model, version, confirmed, update_id in updates:
                     if selected_models and model not in selected_models:
                         continue
                     if manufacturer_filter != "Todas" and manufacturer != manufacturer_filter:
@@ -231,15 +231,22 @@ class Dashboard(QWidget):
                     row_layout.setSpacing(5)
 
                     if confirmed:
-                        icon = QLabel("✅")
-                        icon.setFixedSize(20, 20)
-                        icon.setToolTip(f"{manufacturer} {model}: {version} (Actualizado)")
-                        row_layout.addWidget(icon)
+                        btn = QPushButton("✅")
+                        btn.setFixedSize(20, 20)
+                        btn.setToolTip(f"{manufacturer} {model}: {version} (Actualizado)")
+                        btn.setEnabled(False)
+                        btn.setStyleSheet("""
+                            QPushButton {
+                                background: transparent;
+                                border: none;
+                            }
+                        """)
+                        row_layout.addWidget(btn)
                     else:
                         btn = QPushButton("⏳")
                         btn.setToolTip(f"Marcar {manufacturer} {model}: {version} como actualizado")
                         btn.setFixedSize(20, 20)
-                        btn.clicked.connect(partial(self.mark_update, rowid))
+                        btn.clicked.connect(partial(self.mark_update, tech_id, update_id))
                         row_layout.addWidget(btn)
 
                     text = QLabel(f"{manufacturer} {model}: {version}")
@@ -270,8 +277,8 @@ class Dashboard(QWidget):
                         placeholder.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
                         self.grid_layout.addWidget(placeholder, row, col)
 
-    def mark_update(self, rowid):
-        queries.mark_update_as_confirmed(self.conn, rowid)
+    def mark_update(self, technician_id, update_id):
+        queries.mark_update_as_confirmed(self.conn, technician_id, update_id)
         self.update_dashboard()
 
     def export_current_dashboard(self):
