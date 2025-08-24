@@ -71,11 +71,29 @@ class Dashboard(QWidget):
         self.pending_cb.stateChanged.connect(self.update_dashboard)
 
         filter_layout.addStretch()
+                
+        # Layout horizontal para contador y botones de vista
+        tech_view_layout = QHBoxLayout()
+        filters_container.addLayout(tech_view_layout)
 
-        # Segunda fila: contador de técnicos
+        tech_view_layout.addStretch()
+
+        # Label de técnicos
         self.tech_count_label = QLabel("Técnicos disponibles: 0")
         self.tech_count_label.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
-        filters_container.addWidget(self.tech_count_label, alignment=Qt.AlignmentFlag.AlignHCenter)
+        tech_view_layout.addWidget(self.tech_count_label, alignment=Qt.AlignmentFlag.AlignVCenter)
+
+        tech_view_layout.addStretch()
+
+        # Botones de vista
+        self.grid_btn = QPushButton("Cuadrícula")
+        self.list_btn = QPushButton("Lista")
+        tech_view_layout.addWidget(self.grid_btn)
+        tech_view_layout.addWidget(self.list_btn)
+
+        self.view_mode = "grid"
+        self.grid_btn.clicked.connect(lambda: self.set_view_mode("grid"))
+        self.list_btn.clicked.connect(lambda: self.set_view_mode("list"))
 
         # Grid layout para Workstations con scroll
         self.dashboard_widget = QWidget()
@@ -90,6 +108,10 @@ class Dashboard(QWidget):
         main_layout.addWidget(scroll)
 
         self.update_model_list()
+    
+    def set_view_mode(self, mode):
+            self.view_mode = mode
+            self.update_dashboard()
 
     def update_model_list(self):
         manufacturer_filter = self.manufacturer_cb.currentText()
@@ -126,6 +148,7 @@ class Dashboard(QWidget):
 
         ws_rows = queries.get_workstations_with_assignments(self.conn)
         num_techs = 0
+        row_counter = 0
 
         for ws_id, tech_id, ws_name, tech_name, pos_x, pos_y, pc_serial in ws_rows:
             pending_only = self.pending_cb.isChecked()
@@ -157,84 +180,89 @@ class Dashboard(QWidget):
             group_layout.addWidget(scroll_area)
             group.setLayout(group_layout)
 
+            # Si no hay técnico
             if tech_id is None:
                 no_technician = QLabel("Sin técnico")
                 no_technician.setContentsMargins(2, 0, 0, 0)
                 v_layout.addWidget(no_technician)
+            else:
+                # Filtrado de dispositivos del técnico
+                tech_data = queries.get_technician_devices(self.conn, tech_id)
+                tech_manufacturers = [b for b, m in tech_data]
+                tech_models = [m for b, m in tech_data]
+
+                if filter_active:
+                    if manufacturer_filter != "Todas" and manufacturer_filter not in tech_manufacturers:
+                        continue
+                    if selected_models and not any(m in selected_models for m in tech_models):
+                        continue
+
+                # Filtrado solo pendientes
+                if self.pending_cb.isChecked():
+                    pending_count = queries.get_pending_updates_count(
+                        self.conn, tech_id, manufacturer_filter, selected_models
+                    )
+                    if pending_count == 0:
+                        continue
+
+                num_techs += 1
+
+                # Nombre del técnico
+                technician = QLabel(f"Técnico: {tech_name}")
+                technician.setContentsMargins(2, 0, 0, 0)
+                v_layout.addWidget(technician)
+
+                # Actualizaciones del técnico
+                updates = queries.get_updates_for_technician(self.conn, tech_id)
+                for manufacturer, model, version, confirmed, rowid in updates:
+                    if selected_models and model not in selected_models:
+                        continue
+                    if manufacturer_filter != "Todas" and manufacturer != manufacturer_filter:
+                        continue
+
+                    row_layout = QHBoxLayout()
+                    row_layout.setContentsMargins(1, 0, 0, 0)
+                    row_layout.setSpacing(5)
+
+                    if confirmed:
+                        icon = QLabel("✅")
+                        icon.setFixedSize(20, 20)
+                        icon.setToolTip(f"{manufacturer} {model}: {version} (Actualizado)")
+                        row_layout.addWidget(icon)
+                    else:
+                        btn = QPushButton("⏳")
+                        btn.setToolTip(f"Marcar {manufacturer} {model}: {version} como actualizado")
+                        btn.setFixedSize(20, 20)
+                        btn.clicked.connect(partial(self.mark_update, rowid))
+                        row_layout.addWidget(btn)
+
+                    text = QLabel(f"{manufacturer} {model}: {version}")
+                    row_layout.addWidget(text)
+                    row_layout.addStretch()
+
+                    row_widget = QWidget()
+                    row_widget.setLayout(row_layout)
+                    v_layout.addWidget(row_widget)
+
+            if self.view_mode == "grid":
                 self.grid_layout.addWidget(group, pos_y, pos_x)
-                continue
-
-            # Dispositivos del técnico
-            tech_data = queries.get_technician_devices(self.conn, tech_id)
-            tech_manufacturers = [b for b, m in tech_data]
-            tech_models = [m for b, m in tech_data]
-
-            if filter_active:
-                if manufacturer_filter != "Todas" and manufacturer_filter not in tech_manufacturers:
-                    continue
-                if selected_models and not any(m in selected_models for m in tech_models):
-                    continue
-
-            # Filtro solo pendientes
-            if self.pending_cb.isChecked():
-                pending_count = queries.get_pending_updates_count(
-                    self.conn, tech_id, manufacturer_filter, selected_models
-                )
-                if pending_count == 0:
-                    continue
-
-            num_techs += 1
-
-            technician = QLabel(f"Técnico: {tech_name}")
-            technician.setContentsMargins(2, 0, 0, 0)
-            v_layout.addWidget(technician)
-
-            # Actualizaciones
-            updates = queries.get_updates_for_technician(self.conn, tech_id)
-            for manufacturer, model, version, confirmed, rowid in updates:
-                if selected_models and model not in selected_models:
-                    continue
-                if manufacturer_filter != "Todas" and manufacturer != manufacturer_filter:
-                    continue
-
-                row_layout = QHBoxLayout()
-                row_layout.setContentsMargins(1, 0, 0, 0)
-                row_layout.setSpacing(5)
-
-                if confirmed:
-                    icon = QLabel("✅")
-                    icon.setFixedSize(20, 20)
-                    icon.setToolTip(f"{manufacturer} {model}: {version} (Actualizado)")
-                    row_layout.addWidget(icon)
-                else:
-                    btn = QPushButton("⏳")
-                    btn.setToolTip(f"Marcar {manufacturer} {model}: {version} como actualizado")
-                    btn.setFixedSize(20, 20)
-                    btn.clicked.connect(partial(self.mark_update, rowid))
-                    row_layout.addWidget(btn)
-
-                text = QLabel(f"{manufacturer} {model}: {version}")
-                row_layout.addWidget(text)
-                row_layout.addStretch()
-
-                row_widget = QWidget()
-                row_widget.setLayout(row_layout)
-                v_layout.addWidget(row_widget)
-
-            self.grid_layout.addWidget(group, pos_y, pos_x)
+            else:
+                self.grid_layout.addWidget(group, row_counter, 0)
+                row_counter += 1
 
         # Actualizar contador
         self.tech_count_label.setText(f"Técnicos: {num_techs} / {total_techs}")
 
-        # Rellenar celdas vacías
-        for row in range(MAX_ROWS):
-            for col in range(MAX_COLS):
-                if not self.grid_layout.itemAtPosition(row, col):
-                    placeholder = QWidget()
-                    placeholder.setMinimumSize(WIDGET_WIDTH, WIDGET_HEIGHT)
-                    placeholder.setMaximumSize(WIDGET_WIDTH * MAX_SCALE, WIDGET_HEIGHT * MAX_SCALE)
-                    placeholder.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-                    self.grid_layout.addWidget(placeholder, row, col)
+        # Rellenar celdas vacías solo en vista grid
+        if self.view_mode == "grid":
+            for row in range(MAX_ROWS):
+                for col in range(MAX_COLS):
+                    if not self.grid_layout.itemAtPosition(row, col):
+                        placeholder = QWidget()
+                        placeholder.setMinimumSize(WIDGET_WIDTH, WIDGET_HEIGHT)
+                        placeholder.setMaximumSize(WIDGET_WIDTH * MAX_SCALE, WIDGET_HEIGHT * MAX_SCALE)
+                        placeholder.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+                        self.grid_layout.addWidget(placeholder, row, col)
 
     def mark_update(self, rowid):
         queries.mark_update_as_confirmed(self.conn, rowid)
