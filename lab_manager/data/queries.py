@@ -104,6 +104,17 @@ def get_latest_updates_for_technician(conn, tech_id):
     """, (tech_id,))
     return c.fetchall()
 
+def get_latest_device_updates(conn, limit=20):
+    c = conn.cursor()
+    c.execute("""
+        SELECT d.manufacturer, d.model, du.version, du.created_at
+        FROM DeviceUpdates du
+        JOIN Devices d ON du.device_id = d.id
+        ORDER BY du.created_at DESC
+        LIMIT ?
+    """, (limit,))
+    return c.fetchall()
+
 def mark_update_as_confirmed(conn, technician_id, update_id):
     c = conn.cursor()
     c.execute(

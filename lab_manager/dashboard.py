@@ -15,6 +15,8 @@ from lab_manager.utils import export
 
 WIDGET_WIDTH = 150
 WIDGET_HEIGHT = 180
+FIXED_WIDTH = 180
+FIXED_HEIGHT = 180
 MAX_COLS = 10
 MAX_ROWS = 6
 MAX_SCALE = 2  # factor máximo de expansión
@@ -30,14 +32,18 @@ class Dashboard(QWidget):
         init_db()
         self.conn = get_connection()
 
-        # Layout principal
-        main_layout = QVBoxLayout()
-        self.setLayout(main_layout)
+        # --- Layout horizontal principal ---
+        main_h_layout = QHBoxLayout()
+        self.setLayout(main_h_layout)
 
-        # --- Filtros en columna ---
+        # --- Layout vertical de la parte izquierda ---
+        main_layout = QVBoxLayout()
+        main_h_layout.addLayout(main_layout)
+
+        # --- Filtros en columna (arriba) ---
         filters_container = QVBoxLayout()
         main_layout.addLayout(filters_container)
-        
+
         filter_layout = QHBoxLayout()
         filter_layout.setSpacing(10)
         filters_container.addLayout(filter_layout)
@@ -74,7 +80,7 @@ class Dashboard(QWidget):
         self.pending_cb.stateChanged.connect(self.update_dashboard)
 
         filter_layout.addStretch()
-                
+
         # Layout horizontal para contador y botones de vista
         tech_view_layout = QHBoxLayout()
         filters_container.addLayout(tech_view_layout)
@@ -86,7 +92,7 @@ class Dashboard(QWidget):
         self.tech_count_label.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         tech_view_layout.addWidget(self.tech_count_label, alignment=Qt.AlignmentFlag.AlignVCenter)
 
-        # Botón de exportar a la derecha del label
+        # Botón de exportar
         self.export_btn = QPushButton("Excel")
         tech_view_layout.addWidget(self.export_btn)
         self.export_btn.clicked.connect(self.export_current_dashboard)
@@ -101,6 +107,16 @@ class Dashboard(QWidget):
         self.grid_btn.clicked.connect(lambda: self.set_view_mode("grid"))
         self.list_btn.clicked.connect(lambda: self.set_view_mode("list"))
 
+        # Botón para mostrar/ocultar lateral
+        self.toggle_sidebar_btn = QPushButton("Actualizaciones")
+        self.toggle_sidebar_btn.setCheckable(True)
+        self.toggle_sidebar_btn.clicked.connect(lambda checked: self.sidebar_scroll.setVisible(checked))
+        tech_view_layout.addWidget(self.toggle_sidebar_btn)
+
+        # --- Contenedor central (WS layout + sidebar) ---
+        content_layout = QHBoxLayout()
+        main_layout.addLayout(content_layout)
+
         # Grid layout para Workstations con scroll
         self.dashboard_widget = QWidget()
         self.grid_layout = QGridLayout()
@@ -108,11 +124,30 @@ class Dashboard(QWidget):
         self.grid_layout.setContentsMargins(0, 0, 0, 0)
         self.dashboard_widget.setLayout(self.grid_layout)
 
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setWidget(self.dashboard_widget)
-        main_layout.addWidget(scroll)
+        ws_scroll = QScrollArea()
+        ws_scroll.setWidgetResizable(True)
+        ws_scroll.setWidget(self.dashboard_widget)
+        content_layout.addWidget(ws_scroll, stretch=3)
 
+        # Sidebar con scroll
+        self.sidebar = QWidget()
+        self.sidebar_layout = QVBoxLayout()
+        self.sidebar_layout.setContentsMargins(0, 0, 0, 0)
+        self.sidebar_layout.setSpacing(0)
+        self.sidebar.setLayout(self.sidebar_layout)
+
+        self.latest_updates_list = QListWidget()
+        self.sidebar_layout.addWidget(self.latest_updates_list)
+
+        self.sidebar_scroll = QScrollArea()
+        self.sidebar_scroll.setWidgetResizable(True)
+        self.sidebar_scroll.setWidget(self.sidebar)
+        self.sidebar_scroll.setFixedWidth(250)
+        self.sidebar_scroll.setVisible(False)
+
+        content_layout.addWidget(self.sidebar_scroll, stretch=1)
+
+        # --- Inicializar ---
         self.update_model_list()
     
     def set_view_mode(self, mode):
@@ -163,9 +198,7 @@ class Dashboard(QWidget):
 
             pc_label = f" ({pc_serial})" if pc_serial else ""
             group = QGroupBox(f"{ws_name}{pc_label}")
-            group.setMinimumSize(WIDGET_WIDTH, WIDGET_HEIGHT)
-            group.setMaximumSize(WIDGET_WIDTH * MAX_SCALE, WIDGET_HEIGHT * MAX_SCALE)
-            group.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+            group.setFixedSize(FIXED_WIDTH, FIXED_HEIGHT)
 
             inner_widget = QWidget()
             v_layout = QVBoxLayout()
@@ -272,10 +305,17 @@ class Dashboard(QWidget):
                 for col in range(MAX_COLS):
                     if not self.grid_layout.itemAtPosition(row, col):
                         placeholder = QWidget()
-                        placeholder.setMinimumSize(WIDGET_WIDTH, WIDGET_HEIGHT)
-                        placeholder.setMaximumSize(WIDGET_WIDTH * MAX_SCALE, WIDGET_HEIGHT * MAX_SCALE)
-                        placeholder.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+                        placeholder.setFixedSize(FIXED_WIDTH, FIXED_HEIGHT)
                         self.grid_layout.addWidget(placeholder, row, col)
+
+        self.update_latest_updates()
+
+    def update_latest_updates(self):
+        self.latest_updates_list.clear()
+        updates = queries.get_latest_device_updates(self.conn, limit=20)
+        for manufacturer, model, version, created_at in updates:
+            item_text = f"{created_at[:16]} - {manufacturer} {model}: {version}"
+            self.latest_updates_list.addItem(item_text)
 
     def mark_update(self, technician_id, update_id):
         queries.mark_update_as_confirmed(self.conn, technician_id, update_id)
