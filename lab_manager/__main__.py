@@ -1,6 +1,6 @@
 import sys
 from PyQt6.QtWidgets import QApplication
-from .dashboard import Dashboard
+from lab_manager.dashboard import Dashboard
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

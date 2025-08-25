@@ -34,6 +34,14 @@ python db_setup.py
 python -m lab_manager
 ```
 
+## Ejecutable
+
+Para crear un ejecutable de la aplicación:
+
+```
+pyinstaller --name lab_manager --onefile -w -p . lab_manager/__main__.py
+```
+
 ## Funcionalidades
 
 - Gestión de estaciones de trabajo y PCs

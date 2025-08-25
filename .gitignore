@@ -17,3 +17,8 @@ env/
 .vscode/
 .idea/
 *.iml
+
+# PyInstaller
+dist/
+build/
+*.spec
