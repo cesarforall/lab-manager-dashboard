@@ -4,7 +4,7 @@ import datetime
 from PyQt6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QComboBox, QListWidget, QListWidgetItem, QGridLayout, QGroupBox, QScrollArea,
-    QSizePolicy, QCheckBox, QFileDialog
+    QSizePolicy, QCheckBox, QFileDialog, QSplitter
 )
 from PyQt6.QtCore import Qt
 from functools import partial
@@ -28,21 +28,16 @@ class Dashboard(QWidget):
         self.setWindowTitle("Lab Manager - Dashboard")
         self.resize(1000, 700)
 
-        # Conexión a la base de datos
         init_db()
         self.conn = get_connection()
 
-        # --- Layout horizontal principal ---
-        main_h_layout = QHBoxLayout()
-        self.setLayout(main_h_layout)
-
-        # --- Layout vertical de la parte izquierda ---
         main_layout = QVBoxLayout()
-        main_h_layout.addLayout(main_layout)
+        self.setLayout(main_layout)
 
-        # --- Filtros en columna (arriba) ---
         filters_container = QVBoxLayout()
-        main_layout.addLayout(filters_container)
+        filter_widget = QWidget()
+        filter_widget.setLayout(filters_container)
+        main_layout.addWidget(filter_widget)
 
         filter_layout = QHBoxLayout()
         filter_layout.setSpacing(10)
@@ -53,14 +48,10 @@ class Dashboard(QWidget):
 
         self.manufacturer_cb = QComboBox()
         self.manufacturer_cb.addItem("Todas")
-
-        # --- Marcas desde la base de datos ---
         manufacturers = queries.get_manufacturers(self.conn)
         self.manufacturer_cb.addItems(manufacturers)
-
         self.manufacturer_cb.setFixedWidth(150)
         filter_layout.addWidget(self.manufacturer_cb, alignment=Qt.AlignmentFlag.AlignTop)
-
         self.manufacturer_cb.currentTextChanged.connect(self.update_model_list)
 
         label = QLabel("Filtrar por modelo:")
@@ -74,18 +65,15 @@ class Dashboard(QWidget):
         filter_layout.addWidget(self.model_list, alignment=Qt.AlignmentFlag.AlignTop)
         self.model_list.itemChanged.connect(self.update_dashboard)
 
-        # Checkbox para técnicos con actualizaciones pendientes
         self.pending_cb = QCheckBox("Solo pendientes")
         filter_layout.addWidget(self.pending_cb, alignment=Qt.AlignmentFlag.AlignTop)
         self.pending_cb.stateChanged.connect(self.update_dashboard)
 
         filter_layout.addStretch()
 
-        # Layout horizontal para contador y botones de vista
         tech_view_layout = QHBoxLayout()
         filters_container.addLayout(tech_view_layout)
 
-        # Botón para mostrar/ocultar lateral izquierdo
         self.toggle_sidebar_left_btn = QPushButton("Técnicos")
         self.toggle_sidebar_left_btn.setCheckable(True)
         self.toggle_sidebar_left_btn.clicked.connect(lambda checked: self.left_sidebar_scroll.setVisible(checked))
@@ -93,37 +81,27 @@ class Dashboard(QWidget):
 
         tech_view_layout.addStretch()
 
-        # Label de técnicos
         self.tech_count_label = QLabel("Técnicos disponibles: 0")
         self.tech_count_label.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         tech_view_layout.addWidget(self.tech_count_label, alignment=Qt.AlignmentFlag.AlignVCenter)
 
-        # Botón de exportar
         self.export_btn = QPushButton("Excel")
         tech_view_layout.addWidget(self.export_btn)
         self.export_btn.clicked.connect(self.export_current_dashboard)
 
-        # Botones de vista
         self.grid_btn = QPushButton("Cuadrícula")
         self.list_btn = QPushButton("Lista")
         tech_view_layout.addWidget(self.grid_btn)
         tech_view_layout.addWidget(self.list_btn)
-
         self.view_mode = "grid"
         self.grid_btn.clicked.connect(lambda: self.set_view_mode("grid"))
         self.list_btn.clicked.connect(lambda: self.set_view_mode("list"))
 
-        # Botón para mostrar/ocultar lateral
         self.toggle_sidebar_btn = QPushButton("Actualizaciones")
         self.toggle_sidebar_btn.setCheckable(True)
         self.toggle_sidebar_btn.clicked.connect(lambda checked: self.sidebar_scroll.setVisible(checked))
         tech_view_layout.addWidget(self.toggle_sidebar_btn)
 
-        # --- Contenedor central (WS layout + sidebar) ---
-        content_layout = QHBoxLayout()
-        main_layout.addLayout(content_layout)
-
-        # Sidebar izquierdo con scroll
         self.left_sidebar = QWidget()
         self.left_sidebar_layout = QVBoxLayout()
         self.left_sidebar_layout.setContentsMargins(0, 0, 0, 0)
@@ -136,12 +114,8 @@ class Dashboard(QWidget):
         self.left_sidebar_scroll = QScrollArea()
         self.left_sidebar_scroll.setWidgetResizable(True)
         self.left_sidebar_scroll.setWidget(self.left_sidebar)
-        self.left_sidebar_scroll.setFixedWidth(200)
         self.left_sidebar_scroll.setVisible(False)
 
-        content_layout.addWidget(self.left_sidebar_scroll, stretch=1)
-
-        # Grid layout para Workstations con scroll
         self.dashboard_widget = QWidget()
         self.grid_layout = QGridLayout()
         self.grid_layout.setSpacing(10)
@@ -151,9 +125,7 @@ class Dashboard(QWidget):
         ws_scroll = QScrollArea()
         ws_scroll.setWidgetResizable(True)
         ws_scroll.setWidget(self.dashboard_widget)
-        content_layout.addWidget(ws_scroll, stretch=3)
 
-        # Sidebar con scroll
         self.sidebar = QWidget()
         self.sidebar_layout = QVBoxLayout()
         self.sidebar_layout.setContentsMargins(0, 0, 0, 0)
@@ -166,12 +138,21 @@ class Dashboard(QWidget):
         self.sidebar_scroll = QScrollArea()
         self.sidebar_scroll.setWidgetResizable(True)
         self.sidebar_scroll.setWidget(self.sidebar)
-        self.sidebar_scroll.setFixedWidth(250)
         self.sidebar_scroll.setVisible(False)
 
-        content_layout.addWidget(self.sidebar_scroll, stretch=1)
+        splitter = QSplitter(Qt.Orientation.Horizontal)
+        self.left_sidebar_scroll.setMinimumWidth(100)
+        self.left_sidebar_scroll.setMaximumWidth(400)
+        splitter.addWidget(self.left_sidebar_scroll)
+        splitter.addWidget(ws_scroll)
+        self.sidebar_scroll.setMinimumWidth(100)
+        self.sidebar_scroll.setMaximumWidth(400)
+        splitter.addWidget(self.sidebar_scroll)
+        splitter.setSizes([200, 600, 200])
+        main_layout.addWidget(splitter)
+        main_layout.setStretch(0, 0)
+        main_layout.setStretch(1, 1)
 
-        # --- Inicializar ---
         self.update_model_list()
         self.update_technician_list()
     
