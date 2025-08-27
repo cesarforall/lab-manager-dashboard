@@ -204,7 +204,14 @@ class Dashboard(QWidget):
 
             pc_label = f" ({pc_serial})" if pc_serial else ""
             group = QGroupBox(f"{ws_name}{pc_label}")
-            group.setFixedSize(FIXED_WIDTH, FIXED_HEIGHT)
+
+            if self.view_mode == "list":
+                group.setStyleSheet("QGroupBox { border: none; }")
+                group.setFixedWidth(400)
+                group.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
+            else:
+                group.setStyleSheet("")
+                group.setFixedSize(FIXED_WIDTH, FIXED_HEIGHT)
 
             inner_widget = QWidget()
             v_layout = QVBoxLayout()
@@ -227,9 +234,12 @@ class Dashboard(QWidget):
 
             # Si no hay técnico
             if tech_id is None:
-                no_technician = QLabel("Sin técnico")
-                no_technician.setContentsMargins(2, 0, 0, 0)
-                v_layout.addWidget(no_technician)
+                if self.view_mode == "grid":
+                    no_technician = QLabel("Sin técnico")
+                    no_technician.setContentsMargins(2, 0, 0, 0)
+                    v_layout.addWidget(no_technician)
+                else:
+                    continue
             else:
                 # Filtrado de dispositivos del técnico
                 tech_data = queries.get_technician_devices(self.conn, tech_id)
@@ -301,6 +311,7 @@ class Dashboard(QWidget):
             else:
                 self.grid_layout.addWidget(group, row_counter, 0)
                 row_counter += 1
+
 
         # Actualizar contador
         self.tech_count_label.setText(f"Técnicos: {num_techs} / {total_techs}")
