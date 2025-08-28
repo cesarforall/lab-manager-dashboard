@@ -199,6 +199,7 @@ class Dashboard(QWidget):
 
         for ws_id, tech_id, ws_name, tech_name, pos_x, pos_y, pc_serial in ws_rows:
             pending_only = self.pending_cb.isChecked()
+
             if tech_id is None and (filter_active or pending_only):
                 continue
 
@@ -244,10 +245,10 @@ class Dashboard(QWidget):
                 else:
                     continue
             else:
-                # Filtrado de dispositivos del técnico
-                tech_data = queries.get_technician_devices(self.conn, tech_id)
-                tech_manufacturers = [b for b, m in tech_data]
-                tech_models = [m for b, m in tech_data]
+                # Filtrado de dispositivos según formaciones
+                tech_data = queries.get_technician_trainings(self.conn, tech_id)
+                tech_manufacturers = [b for b, m, *_ in tech_data]
+                tech_models = [m for b, m, *_ in tech_data]
 
                 if filter_active:
                     if manufacturer_filter != "Todas" and manufacturer_filter not in tech_manufacturers:
@@ -255,7 +256,7 @@ class Dashboard(QWidget):
                     if selected_models and not any(m in selected_models for m in tech_models):
                         continue
 
-                # Filtrado solo pendientes
+                # Filtrado solo pendientes usando actualizaciones
                 if self.pending_cb.isChecked():
                     pending_count = queries.get_pending_updates_count(
                         self.conn, tech_id, manufacturer_filter, selected_models
@@ -271,7 +272,7 @@ class Dashboard(QWidget):
                 v_layout.addWidget(technician)
 
                 # Actualizaciones del técnico
-                updates = queries.get_latest_updates_for_technician(self.conn, tech_id)
+                updates = queries.get_latest_updates_for_technician(self.conn, tech_id, limit_per_model=2)
                 for manufacturer, model, version, confirmed, update_id in updates:
                     if selected_models and model not in selected_models:
                         continue

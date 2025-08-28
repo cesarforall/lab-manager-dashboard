@@ -10,9 +10,9 @@ DROP TABLE IF EXISTS Technicians;
 DROP TABLE IF EXISTS Devices;
 DROP TABLE IF EXISTS PCs;
 DROP TABLE IF EXISTS Assignments;
-DROP TABLE IF EXISTS TechnicianDevices;
 DROP TABLE IF EXISTS DeviceUpdates;
 DROP TABLE IF EXISTS TechnicianUpdateConfirmations;
+DROP TABLE IF EXISTS Trainings;
 
 CREATE TABLE Workstations (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -54,14 +54,6 @@ CREATE TABLE Assignments (
     FOREIGN KEY(pc_id) REFERENCES PCs(id)
 );
 
-CREATE TABLE TechnicianDevices (
-    technician_id INTEGER NOT NULL,
-    device_id INTEGER NOT NULL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY(technician_id) REFERENCES Technicians(id),
-    FOREIGN KEY(device_id) REFERENCES Devices(id)
-);
-
 CREATE TABLE DeviceUpdates (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     device_id INTEGER NOT NULL,
@@ -79,12 +71,24 @@ CREATE TABLE TechnicianUpdateConfirmations (
     FOREIGN KEY(technician_id) REFERENCES Technicians(id),
     FOREIGN KEY(update_id) REFERENCES DeviceUpdates(id)
 );
+
+CREATE TABLE Trainings (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    technician_id INTEGER NOT NULL,
+    device_id INTEGER NOT NULL,
+    training_type TEXT NOT NULL, -- inicial, refuerzo
+    trainer_name TEXT,
+    competency_level TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(technician_id) REFERENCES Technicians(id),
+    FOREIGN KEY(device_id) REFERENCES Devices(id)
+);
 """)
 
 max_cols = 10
 max_rows = 6
 
-# Crear WS en posiciones fijas
+# Crear estaciones de trabajo
 workstations = []
 for row in range(max_rows):
     for col in range(max_cols):
@@ -92,7 +96,7 @@ for row in range(max_rows):
         workstations.append((ws_name, col, row))
 c.executemany("INSERT INTO Workstations (name, pos_x, pos_y) VALUES (?,?,?)", workstations)
 
-# Technicians
+# Técnicos
 technicians = [
     "Ana García", "Luis Martínez", "Marta López", "Carlos Sánchez", "Laura Fernández",
     "David Rodríguez", "Elena Gómez", "Javier Ruiz", "Sofía Díaz", "Pablo Moreno",
@@ -101,7 +105,7 @@ technicians = [
 ]
 c.executemany("INSERT INTO Technicians (name) VALUES (?)", [(t,) for t in technicians])
 
-# Devices (nuevos fabricantes y modelos)
+# Dispositivos
 manufacturers_models = [
     ("Apple", "MacBook Pro"), ("HP", "Spectre x360"), ("Dell", "XPS 15"),
     ("Lenovo", "ThinkBook"), ("Asus", "ZenBook 14"), ("Acer", "Swift 3"),
@@ -113,7 +117,7 @@ c.executemany("INSERT INTO Devices (manufacturer, model) VALUES (?,?)", manufact
 pcs = [(i % len(manufacturers_models) + 1, f"PC_{i:03}") for i in range(1, max_cols*max_rows+1)]
 c.executemany("INSERT INTO PCs (device_id, serial_number) VALUES (?,?)", pcs)
 
-# Assignments: uno a uno
+# Asignaciones
 ws_ids = list(range(1, max_cols*max_rows+1))
 tech_ids = list(range(1, len(technicians)+1))
 random.shuffle(ws_ids)
@@ -123,16 +127,22 @@ assignments = []
 for tech_id, ws_id in zip(tech_ids, ws_ids):
     pc_id = ws_id
     assignments.append((ws_id, tech_id, pc_id))
-
 c.executemany("INSERT INTO Assignments (workstation_id, technician_id, pc_id) VALUES (?,?,?)", assignments)
 
-# TechnicianDevices
-td = []
+# Trainings
+trainings = []
+training_types = ["inicial", "refuerzo"]
 for tech_id in tech_ids:
-    devices_for_tech = random.sample(range(1, len(manufacturers_models)+1), random.randint(1, 4))
-    for device_id in devices_for_tech:
-        td.append((tech_id, device_id))
-c.executemany("INSERT INTO TechnicianDevices (technician_id, device_id) VALUES (?,?)", td)
+    devices_for_training = random.sample(range(1, len(manufacturers_models)+1), random.randint(1, 4))
+    for device_id in devices_for_training:
+        training_type = random.choice(training_types)
+        trainer_name = random.choice(technicians)
+        competency_level = random.choice(["básico", "intermedio", "avanzado"])
+        trainings.append((tech_id, device_id, training_type, trainer_name, competency_level))
+c.executemany(
+    "INSERT INTO Trainings (technician_id, device_id, training_type, trainer_name, competency_level) VALUES (?,?,?,?,?)",
+    trainings
+)
 
 # DeviceUpdates
 du = []

@@ -15,9 +15,7 @@ def get_models_by_manufacturer(conn, manufacturer=None):
 
 def get_all_technicians(conn):
     c = conn.cursor()
-    c.execute("""
-        SELECT id, name, created_at FROM Technicians;
-    """)
+    c.execute("SELECT id, name, created_at FROM Technicians;")
     return c.fetchall()
 
 def get_total_technicians(conn):
@@ -41,24 +39,25 @@ def get_workstations_with_assignments(conn):
     return c.fetchall()
 
 def get_technician_devices(conn, tech_id):
+    """Devuelve los dispositivos en los que el técnico tiene formación"""
     c = conn.cursor()
     c.execute("""
         SELECT d.manufacturer, d.model
-        FROM TechnicianDevices td
-        JOIN Devices d ON td.device_id = d.id
-        WHERE td.technician_id = ?
+        FROM Trainings tr
+        JOIN Devices d ON tr.device_id = d.id
+        WHERE tr.technician_id = ?
     """, (tech_id,))
     return c.fetchall()
 
 def get_pending_updates_count(conn, tech_id, manufacturer=None, models=None):
     sql = """
         SELECT COUNT(*)
-        FROM TechnicianDevices td
-        JOIN DeviceUpdates du ON td.device_id = du.device_id
+        FROM Trainings tr
+        JOIN DeviceUpdates du ON tr.device_id = du.device_id
         LEFT JOIN TechnicianUpdateConfirmations tuc
-            ON tuc.technician_id = td.technician_id AND tuc.update_id = du.id
-        JOIN Devices d ON td.device_id = d.id
-        WHERE td.technician_id = ? AND COALESCE(tuc.confirmed,0)=0
+            ON tuc.technician_id = tr.technician_id AND tuc.update_id = du.id
+        JOIN Devices d ON tr.device_id = d.id
+        WHERE tr.technician_id = ? AND COALESCE(tuc.confirmed,0)=0
     """
     params = [tech_id]
     conditions = []
@@ -81,34 +80,32 @@ def get_updates_for_technician(conn, tech_id):
     c.execute("""
         SELECT d.manufacturer, d.model, du.version,
             COALESCE(tuc.confirmed, 0) AS confirmed, du.id AS update_id
-        FROM TechnicianDevices td
-        JOIN Devices d ON td.device_id = d.id
+        FROM Trainings tr
+        JOIN Devices d ON tr.device_id = d.id
         LEFT JOIN DeviceUpdates du ON d.id = du.device_id
         LEFT JOIN TechnicianUpdateConfirmations tuc
-            ON tuc.technician_id = td.technician_id AND tuc.update_id = du.id
-        WHERE td.technician_id = ?
+            ON tuc.technician_id = tr.technician_id AND tuc.update_id = du.id
+        WHERE tr.technician_id = ?
         ORDER BY du.id DESC
     """, (tech_id,))
     return c.fetchall()
-    
-def get_latest_updates_for_technician(conn, tech_id):
+
+def get_latest_updates_for_technician(conn, tech_id, limit_per_model=2):
     c = conn.cursor()
-    c.execute("""
-        SELECT manufacturer, model, version, confirmed, update_id
-        FROM (
+    c.execute(f"""
+        SELECT manufacturer, model, version, confirmed, update_id FROM (
             SELECT d.manufacturer, d.model, du.version,
-                COALESCE(tuc.confirmed, 0) AS confirmed,
-                du.id AS update_id
-            FROM TechnicianDevices td
-            JOIN Devices d ON td.device_id = d.id
+                   COALESCE(tuc.confirmed, 0) AS confirmed,
+                   du.id AS update_id,
+                   ROW_NUMBER() OVER(PARTITION BY d.id ORDER BY du.id DESC) AS rn
+            FROM Trainings t
+            JOIN Devices d ON t.device_id = d.id
             LEFT JOIN DeviceUpdates du ON d.id = du.device_id
             LEFT JOIN TechnicianUpdateConfirmations tuc
-                ON tuc.technician_id = td.technician_id AND tuc.update_id = du.id
-            WHERE td.technician_id = ?
-            ORDER BY du.id DESC
-        )
-        GROUP BY manufacturer, model
-    """, (tech_id,))
+                ON tuc.technician_id = t.technician_id AND tuc.update_id = du.id
+            WHERE t.technician_id = ?
+        ) WHERE rn <= ?
+    """, (tech_id, limit_per_model))
     return c.fetchall()
 
 def get_latest_device_updates(conn, limit=20):
@@ -129,3 +126,17 @@ def mark_update_as_confirmed(conn, technician_id, update_id):
         (technician_id, update_id)
     )
     conn.commit()
+
+def get_technician_trainings(conn, tech_id):
+    """
+    Devuelve una lista de dispositivos en los que el técnico tiene formaciones.
+    Cada elemento es (manufacturer, model, training_type, trainer_name, competency_level).
+    """
+    c = conn.cursor()
+    c.execute("""
+        SELECT d.manufacturer, d.model, t.training_type, t.trainer_name, t.competency_level
+        FROM Trainings t
+        JOIN Devices d ON t.device_id = d.id
+        WHERE t.technician_id = ?
+    """, (tech_id,))
+    return c.fetchall()
