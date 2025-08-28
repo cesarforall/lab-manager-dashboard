@@ -4,7 +4,7 @@ import datetime
 from PyQt6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QComboBox, QListWidget, QListWidgetItem, QGridLayout, QGroupBox, QScrollArea,
-    QSizePolicy, QCheckBox, QFileDialog, QSplitter
+    QSizePolicy, QCheckBox, QFileDialog, QSplitter, QFrame
 )
 from PyQt6.QtCore import Qt
 from functools import partial
@@ -89,13 +89,28 @@ class Dashboard(QWidget):
         tech_view_layout.addWidget(self.export_btn)
         self.export_btn.clicked.connect(self.export_current_dashboard)
 
-        self.grid_btn = QPushButton("Cuadrícula")
+        separator = QFrame()
+        separator.setFrameShape(QFrame.Shape.VLine)
+        separator.setFrameShadow(QFrame.Shadow.Sunken)
+        tech_view_layout.addWidget(separator)
+
+        self.grid_btn = QPushButton("Laboratorio")
+        self.grid_btn.setCheckable(True)
         self.list_btn = QPushButton("Lista")
+        self.list_btn.setCheckable(True)
         tech_view_layout.addWidget(self.grid_btn)
         tech_view_layout.addWidget(self.list_btn)
-        self.view_mode = "grid"
-        self.grid_btn.clicked.connect(lambda: self.set_view_mode("grid"))
+
+        self.view_mode = "list"
+        self.list_btn.setChecked(True)
+
+        self.grid_btn.clicked.connect(lambda: self.set_view_mode("lab"))
         self.list_btn.clicked.connect(lambda: self.set_view_mode("list"))
+
+        separator = QFrame()
+        separator.setFrameShape(QFrame.Shape.VLine)
+        separator.setFrameShadow(QFrame.Shadow.Sunken)
+        tech_view_layout.addWidget(separator)
 
         self.toggle_sidebar_btn = QPushButton("Actualizaciones")
         self.toggle_sidebar_btn.setCheckable(True)
@@ -157,8 +172,10 @@ class Dashboard(QWidget):
         self.update_technician_list()
     
     def set_view_mode(self, mode):
-            self.view_mode = mode
-            self.update_dashboard()
+        self.view_mode = mode
+        self.grid_btn.setChecked(mode == "lab")
+        self.list_btn.setChecked(mode == "list")
+        self.update_dashboard()
 
     def update_model_list(self):
         manufacturer_filter = self.manufacturer_cb.currentText()
@@ -212,7 +229,7 @@ class Dashboard(QWidget):
                 group_layout.setSpacing(0)
                 group.setLayout(group_layout)
                 group.setFixedWidth(400)
-                group.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
+                group.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
             else:
                 group = QGroupBox(f"{ws_name}{pc_label}")
                 group.setFixedSize(FIXED_WIDTH, FIXED_HEIGHT)
@@ -238,7 +255,7 @@ class Dashboard(QWidget):
 
             # Si no hay técnico
             if tech_id is None:
-                if self.view_mode == "grid":
+                if self.view_mode == "lab":
                     no_technician = QLabel("Sin técnico")
                     no_technician.setContentsMargins(2, 0, 0, 0)
                     v_layout.addWidget(no_technician)
@@ -256,12 +273,16 @@ class Dashboard(QWidget):
                     if selected_models and not any(m in selected_models for m in tech_models):
                         continue
 
-                # Filtrado solo pendientes usando actualizaciones
+                # Filtrado solo pendientes usando actualizaciones según filtros
                 if self.pending_cb.isChecked():
-                    pending_count = queries.get_pending_updates_count(
-                        self.conn, tech_id, manufacturer_filter, selected_models
-                    )
-                    if pending_count == 0:
+                    pending_updates = queries.get_latest_updates_for_technician(self.conn, tech_id)
+                    pending_filtered = [
+                        u for u in pending_updates
+                        if (manufacturer_filter == "Todas" or u[0] == manufacturer_filter)
+                        and (not selected_models or u[1] in selected_models)
+                        and not u[3]  # confirmed == False
+                    ]
+                    if len(pending_filtered) == 0:
                         continue
 
                 num_techs += 1
@@ -310,7 +331,7 @@ class Dashboard(QWidget):
                     row_widget.setLayout(row_layout)
                     v_layout.addWidget(row_widget)
 
-            if self.view_mode == "grid":
+            if self.view_mode == "lab":
                 self.grid_layout.addWidget(group, pos_y, pos_x)
             else:
                 self.grid_layout.addWidget(group, row_counter, 0)
@@ -320,7 +341,7 @@ class Dashboard(QWidget):
         self.tech_count_label.setText(f"Técnicos: {num_techs} / {total_techs}")
 
         # Rellenar celdas vacías solo en vista grid
-        if self.view_mode == "grid":
+        if self.view_mode == "lab":
             for row in range(MAX_ROWS):
                 for col in range(MAX_COLS):
                     if not self.grid_layout.itemAtPosition(row, col):
@@ -329,6 +350,7 @@ class Dashboard(QWidget):
                         self.grid_layout.addWidget(placeholder, row, col)
 
         self.update_latest_updates()
+        self.update_technician_list()
 
     def update_latest_updates(self):
         self.latest_updates_list.clear()
@@ -339,8 +361,36 @@ class Dashboard(QWidget):
 
     def update_technician_list(self):
         self.technician_list.clear()
+        
+        manufacturer_filter = self.manufacturer_cb.currentText()
+        selected_models = [
+            self.model_list.item(i).text()
+            for i in range(self.model_list.count())
+            if self.model_list.item(i).checkState() == Qt.CheckState.Checked
+        ]
+        pending_only = self.pending_cb.isChecked()
+        
         technicians = queries.get_all_technicians(self.conn)
         for tech_id, name, created_at in technicians:
+            tech_data = queries.get_technician_trainings(self.conn, tech_id)
+            tech_manufacturers = [b for b, m, *_ in tech_data]
+            tech_models = [m for b, m, *_ in tech_data]
+
+            if manufacturer_filter != "Todas" and manufacturer_filter not in tech_manufacturers:
+                continue
+            if selected_models and not any(m in selected_models for m in tech_models):
+                continue
+            if pending_only:
+                pending_updates = queries.get_latest_updates_for_technician(self.conn, tech_id)
+                pending_filtered = [
+                    u for u in pending_updates
+                    if (manufacturer_filter == "Todas" or u[0] == manufacturer_filter)
+                    and (not selected_models or u[1] in selected_models)
+                    and not u[3]  # confirmed == False
+                ]
+                if len(pending_filtered) == 0:
+                    continue
+
             self.technician_list.addItem(name)
 
     def mark_update(self, technician_id, update_id):
