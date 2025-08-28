@@ -65,7 +65,7 @@ class Dashboard(QWidget):
         filter_layout.addWidget(self.model_list, alignment=Qt.AlignmentFlag.AlignTop)
         self.model_list.itemChanged.connect(self.update_dashboard)
 
-        self.pending_cb = QCheckBox("Solo pendientes")
+        self.pending_cb = QCheckBox("Pendientes de actualizar / notificar")
         filter_layout.addWidget(self.pending_cb, alignment=Qt.AlignmentFlag.AlignTop)
         self.pending_cb.stateChanged.connect(self.update_dashboard)
 
@@ -203,15 +203,22 @@ class Dashboard(QWidget):
                 continue
 
             pc_label = f" ({pc_serial})" if pc_serial else ""
-            group = QGroupBox(f"{ws_name}{pc_label}")
 
             if self.view_mode == "list":
-                group.setStyleSheet("QGroupBox { border: none; }")
+                group = QWidget()
+                group_layout = QVBoxLayout()
+                group_layout.setContentsMargins(0, 0, 0, 0)
+                group_layout.setSpacing(0)
+                group.setLayout(group_layout)
                 group.setFixedWidth(400)
                 group.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
             else:
-                group.setStyleSheet("")
+                group = QGroupBox(f"{ws_name}{pc_label}")
                 group.setFixedSize(FIXED_WIDTH, FIXED_HEIGHT)
+                group_layout = QVBoxLayout()
+                group_layout.setContentsMargins(0, 0, 0, 0)
+                group_layout.setSpacing(0)
+                group.setLayout(group_layout)
 
             inner_widget = QWidget()
             v_layout = QVBoxLayout()
@@ -226,11 +233,7 @@ class Dashboard(QWidget):
             scroll_area.setContentsMargins(0, 0, 0, 0)
             scroll_area.setStyleSheet("QScrollArea { border-top: none; }")
 
-            group_layout = QVBoxLayout()
-            group_layout.setContentsMargins(0, 0, 0, 0)
-            group_layout.setSpacing(0)
             group_layout.addWidget(scroll_area)
-            group.setLayout(group_layout)
 
             # Si no hay técnico
             if tech_id is None:
@@ -311,7 +314,6 @@ class Dashboard(QWidget):
             else:
                 self.grid_layout.addWidget(group, row_counter, 0)
                 row_counter += 1
-
 
         # Actualizar contador
         self.tech_count_label.setText(f"Técnicos: {num_techs} / {total_techs}")
