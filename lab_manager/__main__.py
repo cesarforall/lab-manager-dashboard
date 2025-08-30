@@ -1,5 +1,5 @@
 import sys
-from PyQt6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication
 from lab_manager.dashboard import Dashboard
 
 if __name__ == "__main__":

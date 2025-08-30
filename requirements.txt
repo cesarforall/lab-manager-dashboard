@@ -1,4 +1,4 @@
-PyQt6>=6.5
+pyside6
 pandas
 openpyxl
 pyinstaller

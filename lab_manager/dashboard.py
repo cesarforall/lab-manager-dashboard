@@ -1,12 +1,12 @@
 import sys
 import sqlite3
 import datetime
-from PyQt6.QtWidgets import (
+from PySide6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QComboBox, QListWidget, QListWidgetItem, QGridLayout, QGroupBox, QScrollArea,
     QSizePolicy, QCheckBox, QFileDialog, QSplitter, QFrame
 )
-from PyQt6.QtCore import Qt
+from PySide6.QtCore import Qt
 from functools import partial
 from lab_manager.data.database import get_connection, init_db
 from lab_manager.data import queries
