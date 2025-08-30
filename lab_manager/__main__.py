@@ -1,9 +1,9 @@
 import sys
 from PySide6.QtWidgets import QApplication
-from lab_manager.dashboard import Dashboard
+from lab_manager.main import MainWindow
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    window = Dashboard()
+    window = MainWindow()
     window.show()
     sys.exit(app.exec())
