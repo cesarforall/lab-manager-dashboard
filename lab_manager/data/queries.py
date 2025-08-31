@@ -121,10 +121,11 @@ def get_latest_device_updates(conn, limit=20):
 
 def mark_update_as_confirmed(conn, technician_id, update_id):
     c = conn.cursor()
-    c.execute(
-        "UPDATE TechnicianUpdateConfirmations SET confirmed=1 WHERE technician_id=? AND update_id=?",
-        (technician_id, update_id)
-    )
+    c.execute("""
+        INSERT INTO TechnicianUpdateConfirmations (technician_id, update_id, confirmed)
+        VALUES (?, ?, 1)
+        ON CONFLICT(technician_id, update_id) DO UPDATE SET confirmed=1
+    """, (technician_id, update_id))
     conn.commit()
 
 def get_technician_trainings(conn, tech_id):
