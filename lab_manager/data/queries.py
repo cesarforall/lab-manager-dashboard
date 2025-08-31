@@ -140,3 +140,29 @@ def get_technician_trainings(conn, tech_id):
         WHERE t.technician_id = ?
     """, (tech_id,))
     return c.fetchall()
+
+def add_device_update(conn, manufacturer, model, version):
+    c = conn.cursor()
+    c.execute(
+        "SELECT id FROM Devices WHERE manufacturer=? AND model=?",
+        (manufacturer, model)
+    )
+    row = c.fetchone()
+    if not row:
+        raise ValueError(f"Dispositivo no encontrado: {manufacturer} {model}")
+
+    device_id = row[0]
+
+    c.execute(
+        "SELECT 1 FROM DeviceUpdates WHERE device_id=? AND version=?",
+        (device_id, version)
+    )
+    if c.fetchone():
+        return False
+
+    c.execute(
+        "INSERT INTO DeviceUpdates (device_id, version) VALUES (?, ?)",
+        (device_id, version)
+    )
+    conn.commit()
+    return True
