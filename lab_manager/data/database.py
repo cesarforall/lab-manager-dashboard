@@ -80,6 +80,18 @@ def init_db(db_path: str = DB_FILE):
             FOREIGN KEY(technician_id) REFERENCES Technicians(id),
             FOREIGN KEY(update_id) REFERENCES DeviceUpdates(id)
         );
+
+        CREATE TABLE IF NOT EXISTS Trainings (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            technician_id INTEGER NOT NULL,
+            device_id INTEGER NOT NULL,
+            training_type TEXT,
+            trainer_name TEXT,
+            competency_level TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(technician_id) REFERENCES Technicians(id),
+            FOREIGN KEY(device_id) REFERENCES Devices(id)
+        );
         """)
         conn.commit()
         conn.close()
